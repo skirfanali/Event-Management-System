@@ -1,0 +1,118 @@
+# ==================================================
+# Event Manager System - Git Ignore
+# ==================================================
+
+
+# ==================================================
+# Environment Variables / Secrets
+# ==================================================
+
+.env
+.env.*
+!.env.example
+
+# Spring Boot local/prod configuration
+**/application-local.properties
+**/application-local.yml
+**/application-local.yaml
+
+**/application-prod.properties
+**/application-prod.yml
+**/application-prod.yaml
+
+
+# ==================================================
+# Java / Maven Backend
+# ==================================================
+
+**/target/
+*.class
+
+# Maven logs
+*.log
+
+# Keep Maven Wrapper (.mvn, mvnw, mvnw.cmd)
+
+
+# ==================================================
+# Node.js / Frontend
+# ==================================================
+
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend builds
+**/dist/
+**/build/
+
+# Framework caches
+**/.cache/
+**/.next/
+**/.nuxt/
+
+
+# ==================================================
+# Frontend Environment Files
+# ==================================================
+
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+
+# ==================================================
+# IDE
+# ==================================================
+
+.idea/
+.vscode/
+
+*.iml
+*.ipr
+*.iws
+
+.classpath
+.project
+.settings/
+
+
+# ==================================================
+# OS Files
+# ==================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ==================================================
+# Logs / Temporary Files
+# ==================================================
+
+logs/
+**/logs/
+
+*.tmp
+*.temp
+*.swp
+*.swo
+
+
+# ==================================================
+# Test / Coverage
+# ==================================================
+
+**/coverage/
+.nyc_output/
+
+
+# ==================================================
+# Docker
+# ==================================================
+
+docker-compose.override.yml
