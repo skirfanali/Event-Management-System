@@ -5,11 +5,11 @@ import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
 import TicketPreview from '@/components/ticket/TicketPreview';
 import PDFDownload from '@/components/ticket/PDFDownload';
-import { MOCK_TICKETS } from '@/data/mockData';
+
 
 export default function TicketDetailPage() {
   const { ticketId } = useParams();
-  const ticket = MOCK_TICKETS.find(t => t.id === ticketId) || MOCK_TICKETS[0];
+ 
   return (
     <div style={{ background: 'var(--bg-primary)' }}>
       <Navbar />

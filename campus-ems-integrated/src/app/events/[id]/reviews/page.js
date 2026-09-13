@@ -5,7 +5,7 @@ import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
 import ReviewCard from '@/components/event/ReviewCard';
 import RatingStars from '@/components/event/RatingStars';
-import { MOCK_EVENTS } from '@/data/mockData';
+
 
 const REVIEWS = [
   { id: 1, userName: 'Rahul S', userCollege: 'IIT Delhi', rating: 5, comment: 'Amazing event, well organized!', createdAt: new Date(Date.now() - 86400000) },
@@ -17,7 +17,7 @@ const avg = REVIEWS.reduce((s, r) => s + r.rating, 0) / REVIEWS.length;
 
 export default function EventReviewsPage() {
   const { id } = useParams();
-  const event = MOCK_EVENTS.find(e => e.id === id) || MOCK_EVENTS[0];
+  
   return (
     <div style={{ background: 'var(--bg-primary)' }}>
       <Navbar />

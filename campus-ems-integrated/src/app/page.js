@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { eventService } from '@/services/eventService';
 import { categoryService } from '@/services/categoryService';
-import { TESTIMONIALS, FAQS } from '@/data/mockData';
+
 
 // ── Hero ───────────────────────────────────────────────────────────────────────
 function Hero() {

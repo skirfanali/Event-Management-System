@@ -12,24 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { adminService } from '@/services/adminService';
 import { formatCurrency } from '@/lib/helpers';
 
-// ── Fallback mock data (used only when backend is unreachable) ─────────────
-const MOCK_STATS = {
-  totalRevenue: 0, totalUsers: 0, totalEvents: 0, totalTickets: 0,
-};
-const MOCK_CHARTS = {
-  revenueChart:    [
-    { month: 'Jan', revenue: 0 }, { month: 'Feb', revenue: 0 },
-    { month: 'Mar', revenue: 0 }, { month: 'Apr', revenue: 0 },
-    { month: 'May', revenue: 0 }, { month: 'Jun', revenue: 0 },
-  ],
-  growthChart:     [
-    { month: 'Jan', users: 0, events: 0 }, { month: 'Feb', users: 0, events: 0 },
-    { month: 'Mar', users: 0, events: 0 }, { month: 'Apr', users: 0, events: 0 },
-    { month: 'May', users: 0, events: 0 }, { month: 'Jun', users: 0, events: 0 },
-  ],
-  categoryChart:   [],
-  attendanceChart: [],
-};
+
 
 export default function AdminReportsPage() {
   const { user } = useAuth();
@@ -37,7 +20,7 @@ export default function AdminReportsPage() {
   const [stats,        setStats]        = useState(null);
   const [charts,       setCharts]       = useState(null);
   const [loading,      setLoading]      = useState(true);
-  const [usingMock,    setUsingMock]    = useState(false);
+ 
 
   useEffect(() => {
     // Fire both requests in parallel
@@ -48,23 +31,15 @@ export default function AdminReportsPage() {
       // Summary stats
       if (dashResult.status === 'fulfilled') {
         setStats(dashResult.value);
-      } else {
-        setStats(MOCK_STATS);
-        setUsingMock(true);
-      }
+      } 
       // Chart data
       if (analyticsResult.status === 'fulfilled') {
         setCharts(analyticsResult.value);
-      } else {
-        setCharts(MOCK_CHARTS);
-        setUsingMock(true);
-      }
+      } 
     }).finally(() => setLoading(false));
   }, []);
 
-  const c = charts || MOCK_CHARTS;
-  const s = stats  || MOCK_STATS;
-
+  
   const SUMMARY = [
     { label: 'Total Revenue', value: formatCurrency(s.totalRevenue  || 0), color: '#22c55e' },
     { label: 'Total Users',   value: (s.totalUsers   || 0).toLocaleString(), color: '#6366f1' },
@@ -88,13 +63,12 @@ export default function AdminReportsPage() {
         {loading ? <Loader /> : (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
-            {/* Mock data warning */}
-            {usingMock && (
+            
               <div className="text-xs px-4 py-2 rounded-xl"
                 style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
                 ⚠️ Backend unreachable — showing placeholder data
               </div>
-            )}
+            
 
             {/* ── Summary Cards ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
