@@ -1,118 +1,212 @@
+
 'use client';
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+
 import RevenueChart from '@/components/charts/RevenueChart';
 import GrowthChart from '@/components/charts/GrowthChart';
 import CategoryChart from '@/components/charts/CategoryChart';
 import AttendanceChart from '@/components/charts/AttendanceChart';
+
 import Loader from '@/components/common/Loader';
+
 import { useAuth } from '@/context/AuthContext';
 import { adminService } from '@/services/adminService';
 import { formatCurrency } from '@/lib/helpers';
 
-
-
 export default function AdminReportsPage() {
   const { user } = useAuth();
-  const [sidebarOpen,  setSidebarOpen]  = useState(false);
-  const [stats,        setStats]        = useState(null);
-  const [charts,       setCharts]       = useState(null);
-  const [loading,      setLoading]      = useState(true);
- 
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [charts, setCharts] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Fire both requests in parallel
     Promise.allSettled([
       adminService.getDashboard(),
       adminService.getAnalytics(),
-    ]).then(([dashResult, analyticsResult]) => {
-      // Summary stats
-      if (dashResult.status === 'fulfilled') {
-        setStats(dashResult.value);
-      } 
-      // Chart data
-      if (analyticsResult.status === 'fulfilled') {
-        setCharts(analyticsResult.value);
-      } 
-    }).finally(() => setLoading(false));
+    ])
+      .then(([dashResult, analyticsResult]) => {
+        // Summary stats
+        if (dashResult.status === 'fulfilled') {
+          setStats(dashResult.value);
+        }
+
+        // Chart data
+        if (analyticsResult.status === 'fulfilled') {
+          setCharts(analyticsResult.value);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  
   const SUMMARY = [
-    { label: 'Total Revenue', value: formatCurrency(s.totalRevenue  || 0), color: '#22c55e' },
-    { label: 'Total Users',   value: (s.totalUsers   || 0).toLocaleString(), color: '#6366f1' },
-    { label: 'Total Events',  value: (s.totalEvents  || 0).toLocaleString(), color: '#f43f5e' },
-    { label: 'Total Tickets', value: (s.totalTickets || 0).toLocaleString(), color: '#f59e0b' },
+    {
+      label: 'Total Revenue',
+      value: formatCurrency(stats?.totalRevenue || 0),
+      color: '#22c55e',
+    },
+    {
+      label: 'Total Users',
+      value: (stats?.totalUsers || 0).toLocaleString(),
+      color: '#6366f1',
+    },
+    {
+      label: 'Total Events',
+      value: (stats?.totalEvents || 0).toLocaleString(),
+      color: '#f43f5e',
+    },
+    {
+      label: 'Total Tickets',
+      value: (stats?.totalTickets || 0).toLocaleString(),
+      color: '#f59e0b',
+    },
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ background: 'var(--bg-primary)' }}
+    >
       {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
-      <div className={`fixed lg:static inset-y-0 left-0 z-30 lg:z-auto transform transition-transform duration-300 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} p-4 h-full`}>
+
+      <div
+        className={`fixed lg:static inset-y-0 left-0 z-30 lg:z-auto
+          transform transition-transform duration-300
+          ${sidebarOpen
+            ? 'translate-x-0'
+            : '-translate-x-full lg:translate-x-0'
+          }
+          p-4 h-full`}
+      >
         <AdminSidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <DashboardHeader user={user} onMenuClick={() => setSidebarOpen(true)} title="Reports & Analytics" />
+        <DashboardHeader
+          user={user}
+          onMenuClick={() => setSidebarOpen(true)}
+          title="Reports & Analytics"
+        />
 
-        {loading ? <Loader /> : (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-
-            
-              <div className="text-xs px-4 py-2 rounded-xl"
-                style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
-                ⚠️ Backend unreachable — showing placeholder data
-              </div>
-            
+        {loading ? (
+          <Loader />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div
+              className="text-xs px-4 py-2 rounded-xl"
+              style={{
+                background: 'rgba(245,158,11,0.1)',
+                color: '#f59e0b',
+              }}
+            >
+              ⚠️ Backend unreachable — showing placeholder data
+            </div>
 
             {/* ── Summary Cards ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {SUMMARY.map((s) => (
-                <div key={s.label} className="card p-4 text-center">
-                  <p className="text-xl font-display font-bold" style={{ color: s.color }}>{s.value}</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              {SUMMARY.map((item) => (
+                <div
+                  key={item.label}
+                  className="card p-4 text-center"
+                >
+                  <p
+                    className="text-xl font-display font-bold"
+                    style={{ color: item.color }}
+                  >
+                    {item.value}
+                  </p>
+
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    {item.label}
+                  </p>
                 </div>
               ))}
             </div>
 
             {/* ── Charts ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Revenue */}
               <div className="card p-5">
-                <h3 className="font-display font-bold text-base mb-4" style={{ color: 'var(--text-primary)' }}>
+                <h3
+                  className="font-display font-bold text-base mb-4"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   Revenue Trend
                 </h3>
+
                 {/* data → [ { month, revenue } ] */}
-                <RevenueChart data={c.revenueChart || []} />
+                <RevenueChart
+                  data={charts?.revenueChart || []}
+                />
               </div>
 
+              {/* Growth */}
               <div className="card p-5">
-                <h3 className="font-display font-bold text-base mb-4" style={{ color: 'var(--text-primary)' }}>
+                <h3
+                  className="font-display font-bold text-base mb-4"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   Platform Growth
                 </h3>
+
                 {/* data → [ { month, users, events } ] */}
-                <GrowthChart data={c.growthChart || []} />
+                <GrowthChart
+                  data={charts?.growthChart || []}
+                />
               </div>
 
+              {/* Category */}
               <div className="card p-5">
-                <h3 className="font-display font-bold text-base mb-4" style={{ color: 'var(--text-primary)' }}>
+                <h3
+                  className="font-display font-bold text-base mb-4"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   Events by Category
                 </h3>
+
                 {/* data → [ { name, value (%), count } ] */}
-                <CategoryChart data={c.categoryChart || []} />
+                <CategoryChart
+                  data={charts?.categoryChart || []}
+                />
               </div>
 
+              {/* Attendance */}
               <div className="card p-5">
-                <h3 className="font-display font-bold text-base mb-4" style={{ color: 'var(--text-primary)' }}>
+                <h3
+                  className="font-display font-bold text-base mb-4"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   Attendance Overview
                 </h3>
+
                 {/* data → [ { event, registered, attended } ] */}
-                <AttendanceChart data={c.attendanceChart || []} />
+                <AttendanceChart
+                  data={charts?.attendanceChart || []}
+                />
               </div>
+
             </div>
           </motion.div>
         )}
@@ -120,3 +214,4 @@ export default function AdminReportsPage() {
     </div>
   );
 }
+
