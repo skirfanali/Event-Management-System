@@ -118,6 +118,11 @@ public class EmailUtil {
  // ─── ADD THESE 3 METHODS TO YOUR EXISTING EmailUtil.java ───────────────────
  // Place them alongside your existing sendRegistrationConfirmationEmail() method
 
+ // ✅ FIX: these 3 methods were missing @Async — they ran on the request
+ // thread and blocked the HTTP response until the SMTP call finished (or
+ // hung), which is why submit/approve/reject appeared to time out on the
+ // frontend even though the DB write had already succeeded.
+ @Async
  public void sendOrganizerRequestConfirmationEmail(String to, String name) {
      try {
          SimpleMailMessage msg = new SimpleMailMessage();
@@ -137,6 +142,7 @@ public class EmailUtil {
      }
  }
 
+ @Async
  public void sendOrganizerApprovalEmail(String to, String name) {
      try {
          SimpleMailMessage msg = new SimpleMailMessage();
@@ -160,6 +166,7 @@ public class EmailUtil {
      }
  }
 
+ @Async
  public void sendOrganizerRejectionEmail(String to, String name, String reason) {
      try {
          SimpleMailMessage msg = new SimpleMailMessage();

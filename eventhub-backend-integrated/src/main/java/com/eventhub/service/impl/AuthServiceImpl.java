@@ -64,16 +64,11 @@ public class AuthServiceImpl implements AuthService {
         user = userRepository.save(user);
         emailUtil.sendVerificationEmail(user.getEmail(), user.getName(), verificationToken);
 
-        UserDetails ud = userDetailsService.loadUserByUsername(user.getEmail());
-        String access  = jwtUtil.generateAccessToken(ud);
-        String refresh = jwtUtil.generateRefreshToken(ud);
-
-        user.setRefreshToken(refresh);
-        user.setRefreshTokenExpiry(LocalDateTime.now().plusDays(7));
-        userRepository.save(user);
-
-        log.info("New user registered: {} [{}]", user.getEmail(), user.getRole());
-        return buildAuthResponse(user, access, refresh);
+        // ✅ FIX: previously issued access/refresh tokens here, which logged
+        // the user straight in and skipped email verification entirely.
+        // No tokens are issued until the user verifies their email and logs in.
+        log.info("New user registered (pending email verification): {} [{}]", user.getEmail(), user.getRole());
+        return buildAuthResponse(user, null, null);
     }
 
     @Override
@@ -90,6 +85,12 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User", 0L));
+
+        // ✅ FIX: login previously issued tokens regardless of verification
+        // status, so an unverified account could log in anyway.
+        if (!user.isEmailVerified()) {
+            throw new UnauthorizedException("Please verify your email before logging in. Check your inbox for the verification link.");
+        }
 
         UserDetails ud = userDetailsService.loadUserByUsername(user.getEmail());
         String access  = jwtUtil.generateAccessToken(ud);
