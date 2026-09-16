@@ -24,9 +24,9 @@ public class EmailUtil {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    // ✅ FIX: No @Async — runs on same thread so we can catch errors properly.
-    // ✅ FIX: Never throws — logs error but returns normally so registration
-    //         is NOT rolled back if SMTP fails. User is saved, email may retry.
+    // ✅ @Async — runs on background thread so HTTP response returns instantly
+    // ✅ Never throws — SMTP failure logs error but does NOT roll back registration
+    @Async
     public void sendVerificationEmail(String to, String name, String token) {
         String link = frontendUrl + "/verify-email?token=" + token;
         String html = buildEmailHtml("Verify Your Email", name,
@@ -40,7 +40,8 @@ public class EmailUtil {
         sendHtmlEmailSafe(to, "Verify Your Email - EventHub", html);
     }
 
-    // ✅ FIX: No @Async, never throws
+    // ✅ @Async — same reason as above
+    @Async
     public void sendPasswordResetEmail(String to, String name, String token) {
         String link = frontendUrl + "/reset-password?token=" + token;
         String html = buildEmailHtml("Reset Your Password", name,
@@ -135,8 +136,7 @@ public class EmailUtil {
         sendSimpleEmailSafe(msg);
     }
 
-    // ── Private helpers — never throw, always log ─────────────────────────────
-
+    // ── Private helpers — never throw ─────────────────────────────────────────
     private void sendHtmlEmailSafe(String to, String subject, String html) {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
@@ -148,8 +148,6 @@ public class EmailUtil {
             mailSender.send(msg);
             log.info("✅ Email sent to {}: {}", to, subject);
         } catch (Exception e) {
-            // ✅ Log the real error but NEVER throw — registration must succeed
-            // even if SMTP is misconfigured. Check MAIL_USERNAME/MAIL_PASSWORD env vars.
             log.error("❌ Failed to send email to {} [{}]: {}", to, subject, e.getMessage());
         }
     }

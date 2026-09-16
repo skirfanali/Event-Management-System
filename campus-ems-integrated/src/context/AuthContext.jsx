@@ -7,28 +7,6 @@ import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
 
-// ✅ FIX: Central function to build user object from any API response
-// Ensures organization, designation, website are always included
-const buildUserData = (data) => ({
-  id:            data.id,
-  name:          data.name,
-  email:         data.email,
-  role:          data.role,
-  avatarUrl:     data.avatarUrl,
-  phone:         data.phone,
-  bio:           data.bio,
-  // Student fields
-  college:       data.college,
-  branch:        data.branch,
-  year:          data.year,
-  // ✅ NEW: Organizer fields — were missing, causing blank display after refresh
-  organization:  data.organization,
-  designation:   data.designation,
-  website:       data.website,
-  emailVerified: data.emailVerified,
-  active:        data.active,
-});
-
 export function AuthProvider({ children }) {
   const [user,    setUserState] = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -37,13 +15,24 @@ export function AuthProvider({ children }) {
     const token  = getToken();
     const stored = getUser();
     if (!token) { setLoading(false); return; }
-    if (stored) setUserState(stored); // optimistic render
+    if (stored) setUserState(stored);
     try {
       const me = await api.get(EP.AUTH.ME);
-      // ✅ FIX: use buildUserData so all fields including organizer ones are included
-      const userData = buildUserData(me);
-      setUser(userData);       // persist to localStorage
-      setUserState(userData);  // update React state
+      const userData = {
+        id:            me.id,
+        name:          me.name,
+        email:         me.email,
+        role:          me.role,
+        avatarUrl:     me.avatarUrl,
+        college:       me.college,
+        branch:        me.branch,
+        year:          me.year,
+        phone:         me.phone,
+        bio:           me.bio,
+        emailVerified: me.emailVerified,
+      };
+      setUser(userData);
+      setUserState(userData);
     } catch {
       clearToken();
       setUserState(null);
@@ -60,7 +49,14 @@ export function AuthProvider({ children }) {
     if (!token) throw new Error('No token received from server');
     setToken(token);
     if (data.refreshToken) setRefresh(data.refreshToken);
-    const userData = buildUserData(data);
+    const userData = {
+      id:            data.id,
+      name:          data.name,
+      email:         data.email,
+      role:          data.role,
+      avatarUrl:     data.avatarUrl,
+      emailVerified: data.emailVerified,
+    };
     setUser(userData);
     setUserState(userData);
     toast.success(`Welcome back, ${data.name}!`);
@@ -68,6 +64,9 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (payload) => {
+    // ✅ FIX: Backend no longer returns tokens on register (email verification
+    // required first). Just call the API — on success redirect to verify-email.
+    // Do NOT attempt to auto-login or read accessToken here.
     const data = await api.post(EP.AUTH.REGISTER, {
       name:     payload.name,
       email:    payload.email,
@@ -78,14 +77,8 @@ export function AuthProvider({ children }) {
       year:     payload.year,
       phone:    payload.phone,
     });
-    if (data.accessToken) {
-      setToken(data.accessToken);
-      if (data.refreshToken) setRefresh(data.refreshToken);
-      const userData = buildUserData(data);
-      setUser(userData);
-      setUserState(userData);
-    }
-    toast.success('Account created! Please verify your email.');
+    // data here is AuthResponse with null tokens — just return it
+    // The register page handles the redirect to /verify-email
     return data;
   };
 
@@ -100,23 +93,13 @@ export function AuthProvider({ children }) {
     window.location.href = '/login';
   };
 
-  // ✅ FIX: updateProfile now uses buildUserData and also persists to localStorage
   const updateProfile = async (payload) => {
     const data    = await api.put(EP.USERS.PROFILE, payload);
-    const updated = buildUserData({ ...user, ...data });
+    const updated = { ...user, ...data };
     setUser(updated);
     setUserState(updated);
     toast.success('Profile updated!');
     return updated;
-  };
-
-  // ✅ FIX: Export setUser so settings/profile pages can update state after direct api calls
-  const setUserContext = (updater) => {
-    setUserState(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      setUser(next); // also persist to localStorage
-      return next;
-    });
   };
 
   const refreshUser = async () => { await loadUser(); };
@@ -127,10 +110,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading,
-      login, register, logout,
-      updateProfile, refreshUser,
-      setUser: setUserContext,   // ✅ exported so pages can call setUser(prev => ...)
+      user, loading, login, register, logout, updateProfile, refreshUser,
       isAdmin, isOrganizer, isUser,
     }}>
       {children}
