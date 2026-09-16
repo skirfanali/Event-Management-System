@@ -73,4 +73,11 @@ public class AuthController {
         authService.verifyEmail(token);
         return ResponseEntity.ok(ApiResponse.success("Email verified successfully!"));
     }
+
+    @PostMapping("/resend-verification")
+    @Operation(summary = "Resend the email verification link")
+    public ResponseEntity<ApiResponse<Void>> resendVerification(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.resendVerification(request);
+        return ResponseEntity.ok(ApiResponse.success("If this email is registered and unverified, a new verification link has been sent."));
+    }
 }

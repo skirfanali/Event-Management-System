@@ -1,21 +1,38 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircle, Zap, RefreshCw } from 'lucide-react';
+import { Zap, RefreshCw } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import { authService } from '@/services/authService';
 import toast from 'react-hot-toast';
 
 export default function VerifyEmailPage() {
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') || '';
+
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
+  // ✅ FIX: this used to be fake — a 1s delay then a canned success toast,
+  // with no email to resend to and no real API call. It now hits the real
+  // resend-verification endpoint with the address passed in from register.
   const resend = async () => {
+    if (!email) {
+      toast.error('No email address to resend to — please register again.');
+      return;
+    }
     setResending(true);
-    await new Promise(r => setTimeout(r, 1000));
-    toast.success('Verification email resent!');
-    setResending(false);
-    setCountdown(60);
+    try {
+      await authService.resendVerification(email);
+      toast.success('Verification email sent — check your inbox.');
+      setCountdown(60);
+    } catch (err) {
+      toast.error(err?.message || 'Failed to resend verification email.');
+    } finally {
+      setResending(false);
+    }
   };
 
   useEffect(() => {
@@ -34,10 +51,13 @@ export default function VerifyEmailPage() {
         <div className="card p-10">
           <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity }} className="text-7xl mb-6">📧</motion.div>
           <h1 className="text-2xl font-display font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Verify your Email</h1>
-          <p className="text-sm leading-relaxed mb-8" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-sm leading-relaxed mb-2" style={{ color: 'var(--text-muted)' }}>
             We've sent a verification link to your email. Click the link to activate your account. The link expires in 24 hours.
           </p>
-          <Button onClick={resend} loading={resending} disabled={countdown > 0} variant="secondary" className="w-full flex items-center justify-center gap-2 mb-4">
+          {email && (
+            <p className="text-sm font-medium mb-8" style={{ color: 'var(--text-primary)' }}>{email}</p>
+          )}
+          <Button onClick={resend} loading={resending} disabled={countdown > 0 || !email} variant="secondary" className="w-full flex items-center justify-center gap-2 mb-4">
             <RefreshCw size={15} /> {countdown > 0 ? `Resend in ${countdown}s` : 'Resend Email'}
           </Button>
           <Link href="/login"><Button variant="ghost" className="w-full">Back to Login</Button></Link>

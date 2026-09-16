@@ -183,6 +183,24 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
     }
 
+    // ✅ NEW: the frontend's "Resend Email" button on /verify-email had
+    // nothing to call — it just faked a success toast after a 1s delay.
+    // This issues a fresh token/expiry and actually re-sends the email.
+    @Override
+    public void resendVerification(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.getEmail())
+                .filter(user -> !user.isEmailVerified())
+                .ifPresent(user -> {
+                    String token = UUID.randomUUID().toString();
+                    user.setEmailVerificationToken(token);
+                    user.setEmailVerificationExpiry(LocalDateTime.now().plusHours(24));
+                    userRepository.save(user);
+                    emailUtil.sendVerificationEmail(user.getEmail(), user.getName(), token);
+                });
+        // Same pattern as forgotPassword: respond the same way whether or not
+        // the email exists / is already verified, to avoid email enumeration.
+    }
+
     private AuthResponse buildAuthResponse(User user, String access, String refresh) {
         return AuthResponse.builder()
                 .accessToken(access)

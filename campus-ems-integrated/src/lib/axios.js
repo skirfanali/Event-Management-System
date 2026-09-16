@@ -3,7 +3,12 @@ import { getToken, clearToken } from './token';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
-  timeout: 15000,
+  // ✅ FIX: 15s was too tight for a cold-starting free-tier backend
+  // (Render/Railway free plans sleep after ~15 min idle and can take
+  // 30-60s to wake up) — every request during a cold start was hitting
+  // this ceiling and showing "timeout of 15000ms exceeded" in red,
+  // even though the backend eventually finished the request fine.
+  timeout: 40000,
   headers: { 'Content-Type': 'application/json' },
 });
 

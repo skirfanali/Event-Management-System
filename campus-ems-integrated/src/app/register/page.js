@@ -34,7 +34,7 @@ export default function RegisterPage() {
         password: data.password,
         role:     data.role,
       });
-      router.push('/verify-email');
+      router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
     } catch (err) {
       toast.error(err?.message || 'Registration failed. Please try again.');
     }
