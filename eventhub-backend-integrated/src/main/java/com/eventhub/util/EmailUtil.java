@@ -1,46 +1,85 @@
 package com.eventhub.util;
 
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
-import jakarta.mail.internet.MimeMessage;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+/**
+ * ✅ MIGRATED: Render's free tier blocks outbound SMTP (ports 25/465/587) as of
+ * Sept 2025 — see Render's changelog. Every email send via JavaMailSender/Gmail
+ * SMTP was timing out at the TCP level before ever reaching Gmail. This class now
+ * sends through Brevo's HTTPS transactional email API (port 443, never blocked)
+ * instead of opening a raw SMTP socket. No JavaMailSender/spring.mail.* usage
+ * remains.
+ */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class EmailUtil {
 
-    private final JavaMailSender mailSender;
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${app.mail.from}")
     private String from;
 
+    @Value("${app.mail.from-name:EventHub}")
+    private String fromName;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    // ✅ @Async — runs on background thread so HTTP response returns instantly
-    // ✅ Never throws — SMTP failure logs error but does NOT roll back registration
-    @Async
-    public void sendVerificationEmail(String to, String name, String token) {
-        String link = frontendUrl + "/verify-email?token=" + token;
-        String html = buildEmailHtml("Verify Your Email", name,
-            "<p>Please verify your email address by clicking the button below:</p>" +
-            "<a href='" + link + "' style='background:#6366f1;color:white;padding:12px 24px;" +
-            "border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin:16px 0;'>" +
-            "Verify Email</a>" +
-            "<p style='color:#888;margin-top:16px;font-size:13px;'>Or copy this link:<br/>" +
-            "<a href='" + link + "' style='color:#6366f1;'>" + link + "</a></p>" +
-            "<p style='color:#888;margin-top:16px;'>Link expires in 24 hours.</p>");
-        sendHtmlEmailSafe(to, "Verify Your Email - EventHub", html);
+    @Value("${brevo.api.key:}")
+    private String brevoApiKey;
+
+    @PostConstruct
+    void checkMailConfig() {
+        if (brevoApiKey == null || brevoApiKey.isBlank()) {
+            log.warn("⚠️ BREVO_API_KEY is not set — all emails will fail to send.");
+        }
+        if (from == null || from.isBlank()) {
+            log.warn("⚠️ MAIL_FROM (app.mail.from) is not set — all emails will fail to send.");
+        }
+        log.info("📧 Mail config loaded — provider=Brevo(HTTP API), from={}, frontendUrl={}", from, frontendUrl);
     }
 
-    // ✅ @Async — same reason as above
+    // ── Verification email — synchronous, throws on failure ────────────────────
+    // Kept synchronous and throwing (unlike the others below) so the registration
+    // transaction itself surfaces a failure instead of silently succeeding.
+    public void sendVerificationEmail(String to, String name, String token) {
+        String link = frontendUrl + "/verify-email?token=" + token;
+
+        String html =
+                "<p>Hello " + name + ",</p>" +
+                "<p>Please verify your email address by clicking the button below:</p>" +
+                "<a href='" + link + "' " +
+                "style='background:#6366f1;color:white;padding:12px 24px;" +
+                "border-radius:8px;text-decoration:none;font-weight:bold;" +
+                "display:inline-block;margin:16px 0;'>" +
+                "Verify Email</a>" +
+                "<p style='color:#888;margin-top:16px;font-size:13px;'>" +
+                "Or copy this link:<br/>" +
+                "<a href='" + link + "' style='color:#6366f1;'>" + link + "</a></p>" +
+                "<p style='color:#888;margin-top:16px;'>Link expires in 24 hours.</p>";
+
+        log.info("📧 Starting verification email");
+        log.info("📧 To: {}", to);
+
+        sendHtml(to, "Verify Your Email - EventHub", html, true);
+
+        log.info("✅ VERIFICATION EMAIL SENT SUCCESSFULLY TO {}", to);
+    }
+
     @Async
     public void sendPasswordResetEmail(String to, String name, String token) {
         String link = frontendUrl + "/reset-password?token=" + token;
@@ -50,7 +89,7 @@ public class EmailUtil {
             "border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;margin:16px 0;'>" +
             "Reset Password</a>" +
             "<p style='color:#888;margin-top:16px;'>Link expires in 1 hour. Ignore if not requested.</p>");
-        sendHtmlEmailSafe(to, "Reset Password - EventHub", html);
+        sendHtml(to, "Reset Password - EventHub", html, false);
     }
 
     @Async
@@ -69,7 +108,7 @@ public class EmailUtil {
             "<td style='padding:8px;border:1px solid #e5e7eb;font-family:monospace;'>" + ticketCode + "</td></tr>" +
             "</table>" +
             "<p>Show your QR ticket at the venue entrance. 🎉</p>");
-        sendHtmlEmailSafe(to, "Ticket Confirmed - " + eventTitle, html);
+        sendHtml(to, "Ticket Confirmed - " + eventTitle, html, false);
     }
 
     @Async
@@ -80,7 +119,7 @@ public class EmailUtil {
             "<p>📍 <strong>Venue:</strong> " + venue + "</p>" +
             "<p>🕐 <strong>Date:</strong> " + eventDate + "</p>" +
             "<p>Don't forget to bring your QR ticket. See you there! 🎉</p>");
-        sendHtmlEmailSafe(to, "Reminder: " + eventTitle + " is Tomorrow!", html);
+        sendHtml(to, "Reminder: " + eventTitle + " is Tomorrow!", html, false);
     }
 
     @Async
@@ -91,73 +130,85 @@ public class EmailUtil {
             "<a href='" + frontendUrl + "/dashboard/certificates' style='background:#6366f1;" +
             "color:white;padding:12px 24px;border-radius:8px;text-decoration:none;" +
             "font-weight:bold;display:inline-block;margin:16px 0;'>Download Certificate</a>");
-        sendHtmlEmailSafe(to, "Certificate Ready - " + eventTitle, html);
+        sendHtml(to, "Certificate Ready - " + eventTitle, html, false);
     }
 
     @Async
     public void sendOrganizerRequestConfirmationEmail(String to, String name) {
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(to);
-        msg.setSubject("CampusEvents – Organizer Request Received");
-        msg.setText(
+        String text =
             "Hi " + name + ",\n\n" +
             "We have received your request to become an organizer on CampusEvents.\n\n" +
             "Our admin team will review your application and get back to you within 24–48 hours.\n\n" +
-            "– The CampusEvents Team"
-        );
-        sendSimpleEmailSafe(msg);
+            "– The CampusEvents Team";
+        sendText(to, "CampusEvents – Organizer Request Received", text, false);
     }
 
     @Async
     public void sendOrganizerApprovalEmail(String to, String name) {
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(to);
-        msg.setSubject("🎉 CampusEvents – Your Organizer Account is Approved!");
-        msg.setText(
+        String text =
             "Hi " + name + ",\n\n" +
             "Your organizer account request has been APPROVED!\n\n" +
             "Login here: " + frontendUrl + "/login\n\n" +
-            "Welcome aboard!\n\n– The CampusEvents Team"
-        );
-        sendSimpleEmailSafe(msg);
+            "Welcome aboard!\n\n– The CampusEvents Team";
+        sendText(to, "🎉 CampusEvents – Your Organizer Account is Approved!", text, false);
     }
 
     @Async
     public void sendOrganizerRejectionEmail(String to, String name, String reason) {
-        SimpleMailMessage msg = new SimpleMailMessage();
-        msg.setTo(to);
-        msg.setSubject("CampusEvents – Organizer Request Update");
-        msg.setText(
+        String text =
             "Hi " + name + ",\n\n" +
             "After reviewing your application, we are unable to approve your request at this time.\n\n" +
             (reason != null && !reason.isBlank() ? "Reason: " + reason + "\n\n" : "") +
-            "You are welcome to reapply in the future.\n\n– The CampusEvents Team"
-        );
-        sendSimpleEmailSafe(msg);
+            "You are welcome to reapply in the future.\n\n– The CampusEvents Team";
+        sendText(to, "CampusEvents – Organizer Request Update", text, false);
     }
 
-    // ── Private helpers — never throw ─────────────────────────────────────────
-    private void sendHtmlEmailSafe(String to, String subject, String html) {
-        try {
-            MimeMessage msg = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
-            helper.setFrom(from);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true);
-            mailSender.send(msg);
-            log.info("✅ Email sent to {}: {}", to, subject);
-        } catch (Exception e) {
-            log.error("❌ Failed to send email to {} [{}]: {}", to, subject, e.getMessage());
-        }
+    // ── Core senders — HTTPS to Brevo, no SMTP socket involved ─────────────────
+
+    private void sendHtml(String to, String subject, String html, boolean criticalPath) {
+        Map<String, Object> body = buildBody(to, subject);
+        body.put("htmlContent", html);
+        post(body, to, subject, criticalPath);
     }
 
-    private void sendSimpleEmailSafe(SimpleMailMessage msg) {
+    private void sendText(String to, String subject, String text, boolean criticalPath) {
+        Map<String, Object> body = buildBody(to, subject);
+        body.put("textContent", text);
+        post(body, to, subject, criticalPath);
+    }
+
+    private Map<String, Object> buildBody(String to, String subject) {
+        Map<String, Object> body = new HashMap<>();
+        Map<String, String> sender = new HashMap<>();
+        sender.put("name", fromName);
+        sender.put("email", from);
+        body.put("sender", sender);
+        body.put("to", List.of(Map.of("email", to)));
+        body.put("subject", subject);
+        return body;
+    }
+
+    /**
+     * @param criticalPath if true, rethrows on failure (verification email only —
+     *                     the caller/registration flow needs to see it failed).
+     *                     Everything else logs and swallows, same as before.
+     */
+    private void post(Map<String, Object> body, String to, String subject, boolean criticalPath) {
         try {
-            mailSender.send(msg);
-            log.info("✅ Simple email sent to {}", String.join(",", msg.getTo()));
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("api-key", brevoApiKey);
+            headers.set("accept", "application/json");
+
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+            restTemplate.postForEntity(BREVO_API_URL, request, String.class);
+
+            log.info("✅ Email sent via Brevo to {}: {}", to, subject);
         } catch (Exception e) {
-            log.error("❌ Failed to send simple email: {}", e.getMessage());
+            log.error("❌ Failed to send email to {} [{}]: {}", to, subject, e.getMessage(), e);
+            if (criticalPath) {
+                throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
+            }
         }
     }
 
